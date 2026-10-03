@@ -12,6 +12,14 @@ val keystoreProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 
+// versionCode must grow with every release, otherwise Android refuses to update. It is the commit count,
+// so local and CI builds of the same commit agree; CI passes it explicitly via -PappVersionCode.
+val appVersionCode = providers.gradleProperty("appVersionCode").orNull?.toInt()
+    ?: runCatching {
+        providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }.standardOutput.asText.get().trim().toInt()
+    }.getOrDefault(1)
+val appVersionName = providers.gradleProperty("appVersionName").orNull ?: "dev-$appVersionCode"
+
 android {
     namespace = "ru.family.homechat"
     compileSdk = 35
@@ -20,9 +28,11 @@ android {
         applicationId = "ru.family.homechat"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         buildConfigField("String", "SERVER", "\"https://89-125-106-233.sslip.io\"")
+        // Assets of the newest GitHub release: version.json and HomeChat.apk.
+        buildConfigField("String", "UPDATES", "\"https://github.com/webag/home-chat/releases/latest/download\"")
     }
 
     signingConfigs {

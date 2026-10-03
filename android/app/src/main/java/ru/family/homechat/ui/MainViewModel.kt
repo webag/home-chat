@@ -14,11 +14,14 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import ru.family.homechat.data.Chat
 import ru.family.homechat.data.ChatEntry
 import ru.family.homechat.data.FAMILY_CHAT
 import ru.family.homechat.data.Member
+import ru.family.homechat.data.Release
 import ru.family.homechat.data.Repo
+import ru.family.homechat.data.Updater
 import ru.family.homechat.data.directChatId
 
 /** Content received via "Share" from another app, waiting for the user to pick a chat. */
@@ -60,6 +63,16 @@ class MainViewModel : ViewModel() {
     val shared = MutableStateFlow<Shared?>(null)
     /** Chat to open from a tapped notification. */
     val openChat = MutableStateFlow<String?>(null)
+
+    /** Newer release to offer; null when up to date or the user chose "later". */
+    val update = MutableStateFlow<Release?>(null)
+
+    init {
+        viewModelScope.launch { runCatching { checkUpdate() } }
+    }
+
+    /** Throws on network errors so a manual check can report them. */
+    suspend fun checkUpdate(): Release? = Updater.check().also { update.value = it }
 
     fun member(uid: String) = members.value.firstOrNull { it.uid == uid }
 

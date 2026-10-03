@@ -33,7 +33,24 @@ cd android
 # -> app/build/outputs/apk/release/app-release.apk
 ```
 
-Для обновления поверх установленной версии увеличить `versionCode` в `android/app/build.gradle.kts`.
+`versionCode` = число коммитов (`git rev-list --count HEAD`), поэтому растёт сам.
+
+## Релиз и обновления
+
+```bash
+git tag v1.1 && git push origin v1.1
+```
+
+GitHub Actions ([release.yml](.github/workflows/release.yml)) соберёт подписанный APK и создаст релиз с `HomeChat.apk` и `version.json`.
+Приложение при запуске проверяет `releases/latest/download/version.json` и предлагает обновиться (или вручную: меню → «Проверить обновления»).
+Ссылка для первой установки: https://github.com/webag/home-chat/releases/latest/download/HomeChat.apk
+
+Секреты репозитория (Settings → Secrets and variables → Actions):
+
+| Секрет | Значение |
+|---|---|
+| `KEYSTORE_BASE64` | `android/homechat.jks` в base64 |
+| `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` | из `android/keystore.properties` |
 
 ## Сервер
 

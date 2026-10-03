@@ -42,11 +42,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import ru.family.homechat.BuildConfig
 import ru.family.homechat.data.ChatEntry
 import ru.family.homechat.data.Repo
 
@@ -55,6 +57,8 @@ import ru.family.homechat.data.Repo
 fun ChatListScreen(vm: MainViewModel, title: String, onOpen: (String) -> Unit, onBack: (() -> Unit)? = null) {
     val entries by vm.entries.collectAsStateWithLifecycle()
     val me by vm.me.collectAsStateWithLifecycle()
+    val update by vm.update.collectAsStateWithLifecycle()
+    val ctx = LocalContext.current
     var menu by remember { mutableStateOf(false) }
     var confirmLogout by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -78,7 +82,18 @@ fun ChatListScreen(vm: MainViewModel, title: String, onOpen: (String) -> Unit, o
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
                         val name = me?.let { vm.member(it)?.name } ?: ""
                         DropdownMenuItem(text = { Text("Вы: $name") }, onClick = {}, enabled = false)
+                        DropdownMenuItem(text = { Text("Проверить обновления") }, onClick = {
+                            menu = false
+                            scope.launch {
+                                try {
+                                    if (vm.checkUpdate() == null) FileActions.toast(ctx, "У вас последняя версия")
+                                } catch (e: Exception) {
+                                    FileActions.toast(ctx, "Не удалось проверить обновления")
+                                }
+                            }
+                        })
                         DropdownMenuItem(text = { Text("Выйти") }, onClick = { menu = false; confirmLogout = true })
+                        DropdownMenuItem(text = { Text("Версия ${BuildConfig.VERSION_NAME}") }, onClick = {}, enabled = false)
                     }
                 }
             },
@@ -88,6 +103,8 @@ fun ChatListScreen(vm: MainViewModel, title: String, onOpen: (String) -> Unit, o
             items(entries, key = { it.id }) { e -> ChatRow(vm, e, me) { onOpen(e.id) } }
         }
     }
+
+    update?.takeIf { onBack == null }?.let { UpdateDialog(it, onDismiss = { vm.update.value = null }) }
 
     if (confirmLogout) AlertDialog(
         onDismissRequest = { confirmLogout = false },

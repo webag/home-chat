@@ -13,3 +13,4 @@ server/data/
 *firebase-adminsdk*.json
 PIN-коды.txt
 /google-services.json
+.vscode

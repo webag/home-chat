@@ -1,0 +1,65 @@
+# Push a tag like v1.2 -> signed APK is built and published as a GitHub Release.
+# The app checks releases/latest/download/version.json and offers the update.
+name: Release APK
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # versionCode is the commit count
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret KEYSTORE_BASE64 is not set"; exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > homechat.jks
+          cat > keystore.properties <<EOF
+          storeFile=homechat.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Build
+        run: |
+          VERSION_NAME="${GITHUB_REF_NAME#v}"
+          VERSION_CODE="$(git rev-list --count HEAD)"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          chmod +x gradlew
+          ./gradlew assembleRelease -PappVersionCode="$VERSION_CODE" -PappVersionName="$VERSION_NAME"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk HomeChat.apk
+          jq -n --argjson code "$VERSION_CODE" --arg name "$VERSION_NAME" \
+            '{versionCode: $code, versionName: $name}' > version.json
+          gh release create "$GITHUB_REF_NAME" HomeChat.apk version.json \
+            --title "Home Chat $VERSION_NAME" --generate-notes
