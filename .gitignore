@@ -1,0 +1,15 @@
+.tools/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/keystore.properties
+android/homechat.jks
+service-account.json
+server/service-account.json
+server/members.json
+server/data/
+*.apk
+*firebase-adminsdk*.json
+PIN-коды.txt
+/google-services.json
