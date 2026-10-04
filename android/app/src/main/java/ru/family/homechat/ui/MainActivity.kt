@@ -82,8 +82,10 @@ private fun Root(vm: MainViewModel) {
 
     NavHost(nav, startDestination = "chats") {
         composable("chats") {
-            ChatListScreen(vm, title = "Семья", onOpen = { nav.navigate("chat/$it") })
+            ChatListScreen(vm, title = "Семья", onOpen = { nav.navigate("chat/$it") },
+                onProfile = { nav.navigate("profile") { launchSingleTop = true } })
         }
+        composable("profile") { ProfileScreen(vm, onBack = { nav.popBackStack() }) }
         composable("share") {
             ChatListScreen(vm, title = "Кому отправить?", onBack = {
                 vm.shared.value = null

@@ -6,7 +6,17 @@ import com.google.firebase.firestore.DocumentSnapshot.ServerTimestampBehavior
 import ru.family.homechat.BuildConfig
 import java.util.Date
 
-data class Member(val uid: String, val name: String, val email: String, val color: String)
+/** [name] may be the viewer's own name for this contact; [realName] is the one the member has. */
+data class Member(
+    val uid: String,
+    val name: String,
+    val email: String,
+    val color: String,
+    val avatar: String? = null,
+    val realName: String = name,
+) {
+    val avatarUrl get() = avatar?.let(FileRef::fileUrl)
+}
 
 data class FileRef(
     val path: String,
@@ -95,7 +105,10 @@ data class Chat(
 }
 
 /** One row of the chat list: the family group or a direct chat with one member. */
-data class ChatEntry(val id: String, val title: String, val color: String?, val isGroup: Boolean, val chat: Chat?, val unread: Boolean)
+data class ChatEntry(
+    val id: String, val title: String, val color: String?, val isGroup: Boolean, val chat: Chat?, val unread: Boolean,
+    val avatarUrl: String? = null,
+)
 
 fun directChatId(a: String, b: String) = "dm_" + listOf(a, b).sorted().joinToString("_")
 

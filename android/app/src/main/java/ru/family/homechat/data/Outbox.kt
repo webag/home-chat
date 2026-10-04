@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.CoroutineScope
@@ -69,7 +70,7 @@ object Outbox {
     private suspend fun upload(ctx: Context, chatId: String, peer: String?, caption: String, att: Attachment, jobId: String) {
         val p = Media.prepare(ctx, att)
         try {
-            val thumbPath = p.thumb?.let { Api.upload(it, "thumb.jpg", "image/jpeg") }
+            val thumbPath = p.thumb?.let { Api.upload(it, "thumb.webp", "image/webp") }
             val path = Api.upload(p.file, p.name, p.mime) { f ->
                 items.update { list -> list.map { if (it.id == jobId) it.copy(progress = f) else it } }
             }
@@ -135,37 +136,50 @@ object Media {
         return out
     }
 
-    /** Max 1920px on the long side, JPEG 82% — like Telegram's "photo" mode. */
+    /** Max 1920px on the long side, WebP 80%; only this compressed copy is uploaded and stored. */
     private fun compressImage(ctx: Context, a: Attachment, dir: File): Prepared {
+        // Not decodable (heic on old phones, etc.) — send as is.
+        val bmp = decode(ctx, a.uri, 1920) ?: return Prepared(copy(ctx, a, dir), a.name, a.mime, "file")
+        val out = File(dir, UUID.randomUUID().toString())
+        out.outputStream().use { bmp.compress(WEBP, WEBP_QUALITY, it) }
+        val w = bmp.width; val h = bmp.height
+        bmp.recycle()
+        val name = a.name.substringBeforeLast('.', a.name) + ".webp"
+        return Prepared(out, name, "image/webp", "image", w, h)
+    }
+
+    /** Decodes an image upright (EXIF rotation applied) with the long side at most [maxSide]; null if undecodable. */
+    fun decode(ctx: Context, uri: Uri, maxSide: Int): Bitmap? {
         val cr = ctx.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        cr.openInputStream(a.uri)!!.use { BitmapFactory.decodeStream(it, null, bounds) }
-        if (bounds.outWidth <= 0) {   // not decodable (heic on old phones, etc.) — send as is
-            val f = copy(ctx, a, dir)
-            return Prepared(f, a.name, a.mime, "file")
-        }
+        // With inJustDecodeBounds decodeStream always returns null; only the filled-in bounds matter.
+        val stream = cr.openInputStream(uri) ?: return null
+        stream.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0) return null
         var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1920) sample *= 2
-        var bmp = cr.openInputStream(a.uri)!!.use {
+        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
+        var bmp = cr.openInputStream(uri)?.use {
             BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-        }!!
+        } ?: return null
         val rotation = runCatching {
-            cr.openInputStream(a.uri)!!.use { ExifInterface(it).rotationDegrees }
+            cr.openInputStream(uri)!!.use { ExifInterface(it).rotationDegrees }
         }.getOrDefault(0)
-        val scale = minOf(1f, 1920f / maxOf(bmp.width, bmp.height))
+        val scale = minOf(1f, maxSide.toFloat() / maxOf(bmp.width, bmp.height))
         if (scale < 1f || rotation != 0) {
             val m = Matrix().apply { postScale(scale, scale); postRotate(rotation.toFloat()) }
             val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
             if (rotated != bmp) bmp.recycle()
             bmp = rotated
         }
-        val out = File(dir, UUID.randomUUID().toString())
-        out.outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 82, it) }
-        val w = bmp.width; val h = bmp.height
-        bmp.recycle()
-        val name = a.name.substringBeforeLast('.', a.name) + ".jpg"
-        return Prepared(out, name, "image/jpeg", "image", w, h)
+        return bmp
     }
+
+    const val WEBP_QUALITY = 80
+
+    /** Lossy WebP; before Android 11 the old WEBP format is lossy for quality < 100. */
+    @Suppress("DEPRECATION")
+    val WEBP: Bitmap.CompressFormat =
+        if (Build.VERSION.SDK_INT >= 30) Bitmap.CompressFormat.WEBP_LOSSY else Bitmap.CompressFormat.WEBP
 
     private fun videoInfo(f: File, dir: File, a: Attachment): Prepared {
         val r = MediaMetadataRetriever()
@@ -179,7 +193,7 @@ object Media {
                 val s = minOf(1f, 480f / maxOf(frame.width, frame.height))
                 val small = Bitmap.createScaledBitmap(frame, (frame.width * s).toInt(), (frame.height * s).toInt(), true)
                 File(dir, UUID.randomUUID().toString()).also { tf ->
-                    tf.outputStream().use { small.compress(Bitmap.CompressFormat.JPEG, 75, it) }
+                    tf.outputStream().use { small.compress(WEBP, WEBP_QUALITY, it) }
                 }
             }
             Prepared(f, a.name, a.mime, "video", w, h, thumb)

@@ -13,12 +13,14 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.family.homechat.data.Chat
 import ru.family.homechat.data.ChatEntry
 import ru.family.homechat.data.FAMILY_CHAT
 import ru.family.homechat.data.Member
+import ru.family.homechat.data.NicknameCache
 import ru.family.homechat.data.Release
 import ru.family.homechat.data.Repo
 import ru.family.homechat.data.Updater
@@ -35,8 +37,18 @@ class MainViewModel : ViewModel() {
         awaitClose { Repo.auth.removeAuthStateListener(l) }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, Repo.uid)
 
-    val members: StateFlow<List<Member>> = me.flatMapLatest { if (it == null) flowOf(emptyList()) else Repo.members() }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /** The viewer's own names for other members (uid -> name). */
+    val nicknames: StateFlow<Map<String, String>> =
+        me.flatMapLatest { if (it == null) flowOf(emptyMap()) else Repo.nicknames(it) }
+            .onEach { NicknameCache.save(it) }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    /** Members with custom names applied, so every screen shows them without extra work. */
+    val members: StateFlow<List<Member>> = combine(
+        me.flatMapLatest { if (it == null) flowOf(emptyList()) else Repo.members() }, nicknames, me,
+    ) { list, nicks, me ->
+        list.map { m -> nicks[m.uid]?.takeIf { m.uid != me }?.let { m.copy(name = it) } ?: m }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val chats: StateFlow<List<Chat>> = me.flatMapLatest { if (it == null) flowOf(emptyList()) else Repo.chats(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -55,7 +67,7 @@ class MainViewModel : ViewModel() {
         val list = mutableListOf(ChatEntry(FAMILY_CHAT, family?.title ?: "Семья", null, true, family, unread(family)))
         members.filter { it.uid != me }.forEach { m ->
             val id = directChatId(me, m.uid)
-            list += ChatEntry(id, m.name, m.color, false, byId[id], unread(byId[id]))
+            list += ChatEntry(id, m.name, m.color, false, byId[id], unread(byId[id]), m.avatarUrl)
         }
         list.sortedByDescending { it.chat?.last?.at?.time ?: if (it.isGroup) 1L else 0L }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())

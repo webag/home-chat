@@ -28,6 +28,7 @@ object Repo {
             val token = FirebaseMessaging.getInstance().token.await()
             db.collection("users").document(me).update("fcmTokens", FieldValue.arrayRemove(token)).await()
         }
+        NicknameCache.clear()
         auth.signOut()
     }
 
@@ -43,10 +44,30 @@ object Repo {
         val reg = db.collection("users").orderBy("order").addSnapshotListener { snap, _ ->
             snap ?: return@addSnapshotListener
             trySend(snap.documents.map {
-                Member(it.id, it.getString("name") ?: "?", it.getString("email") ?: "", it.getString("color") ?: "#90A4AE")
+                Member(it.id, it.getString("name") ?: "?", it.getString("email") ?: "", it.getString("color") ?: "#90A4AE",
+                    it.getString("avatar"))
             })
         }
         awaitClose { reg.remove() }
+    }
+
+    /** The viewer's own names for contacts; the doc is readable by its owner only (see firestore.rules). */
+    private fun contactsDoc(me: String) = db.collection("users").document(me).collection("private").document("contacts")
+
+    @Suppress("UNCHECKED_CAST")
+    fun nicknames(me: String): Flow<Map<String, String>> = callbackFlow {
+        val reg = contactsDoc(me).addSnapshotListener { snap, _ ->
+            snap ?: return@addSnapshotListener
+            trySend((snap.get("names") as? Map<String, String>).orEmpty().filterValues { it.isNotBlank() })
+        }
+        awaitClose { reg.remove() }
+    }
+
+    /** A blank [name] removes the custom name, bringing back the member's real one. */
+    fun setNickname(uid: String, name: String) {
+        val me = this.uid ?: return
+        val value: Any = name.trim().ifBlank { FieldValue.delete() }
+        contactsDoc(me).set(mapOf("names" to mapOf(uid to value)), SetOptions.merge())
     }
 
     fun chats(me: String): Flow<List<Chat>> = callbackFlow {

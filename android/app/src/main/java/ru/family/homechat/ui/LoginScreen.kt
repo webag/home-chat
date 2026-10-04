@@ -118,7 +118,7 @@ private fun MemberTile(m: Member, modifier: Modifier, onClick: () -> Unit) {
         modifier.clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Avatar(m.name, m.color, size = 68.dp)
+        Avatar(m, 68.dp)
         Spacer(Modifier.height(8.dp))
         Text(m.name, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -148,7 +148,7 @@ private fun PinForm(m: Member, onBack: () -> Unit) {
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Avatar(m.name, m.color, size = 84.dp)
+        Avatar(m, 84.dp)
         Spacer(Modifier.height(10.dp))
         Text(m.name, style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(4.dp))

@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import ru.family.homechat.App
 import ru.family.homechat.R
+import ru.family.homechat.data.NicknameCache
 import ru.family.homechat.data.Repo
 import ru.family.homechat.ui.MainActivity
 
@@ -30,7 +31,11 @@ class PushService : FirebaseMessagingService() {
         val d = m.data
         val chatId = d["chatId"] ?: return
         if (App.foreground && App.openChatId == chatId) return
-        Notifications.show(this, chatId, d["title"] ?: "", d["sender"] ?: "", d["body"] ?: "", d["group"] == "1")
+        val group = d["group"] == "1"
+        val sender = d["senderId"]?.let(NicknameCache::get) ?: d["sender"] ?: ""
+        // In direct chats the title is the sender's name, so it gets the custom name too.
+        val title = if (group) d["title"] ?: "" else sender
+        Notifications.show(this, chatId, title, sender, d["body"] ?: "", group)
     }
 }
 

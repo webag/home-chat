@@ -10,6 +10,11 @@ service cloud.firestore {
       allow read: if isFamily();
       allow update: if isFamily() && request.auth.uid == uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmTokens', 'lastSeen']);
+
+      // Personal settings (e.g. own names for contacts): visible to the owner only.
+      match /private/{doc} {
+        allow read, write: if isFamily() && request.auth.uid == uid;
+      }
     }
 
     match /chats/{chatId} {

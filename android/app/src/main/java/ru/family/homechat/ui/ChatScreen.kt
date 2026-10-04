@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -41,13 +42,16 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,9 +60,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -129,6 +135,9 @@ fun ChatScreen(vm: MainViewModel, chatId: String, takeShared: Boolean, onBack: (
     val peer = remember(chatId, me) { vm.peerOf(chatId) }
     val peerMember = members.firstOrNull { it.uid == peer }
     val title = if (isGroup) chat?.title ?: "Семья" else peerMember?.name ?: ""
+    var chatMenu by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
+    if (renaming && peerMember != null) RenameDialog(peerMember, onDismiss = { renaming = false })
 
     var limit by remember { mutableLongStateOf(100) }
     var messages by remember { mutableStateOf<List<Message>>(emptyList()) }
@@ -197,13 +206,29 @@ fun ChatScreen(vm: MainViewModel, chatId: String, takeShared: Boolean, onBack: (
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Назад") } },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Avatar(title, peerMember?.color, group = isGroup, size = 40.dp)
+                        Avatar(title, peerMember?.color, group = isGroup, size = 40.dp, url = peerMember?.avatarUrl)
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (isGroup) Text(plural(members.size, "участник", "участника", "участников"),
-                                style = MaterialTheme.typography.labelMedium,
+                            val subtitle = when {
+                                isGroup -> plural(members.size, "участник", "участника", "участников")
+                                peerMember != null && peerMember.name != peerMember.realName -> peerMember.realName
+                                else -> null
+                            }
+                            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                },
+                actions = {
+                    if (peerMember != null) {
+                        Box {
+                            IconButton(onClick = { chatMenu = true }) { Icon(Icons.Filled.MoreVert, "Меню") }
+                            DropdownMenu(chatMenu, onDismissRequest = { chatMenu = false }) {
+                                DropdownMenuItem(text = { Text("Переименовать") },
+                                    leadingIcon = { Icon(Icons.Outlined.Edit, null) },
+                                    onClick = { chatMenu = false; renaming = true })
+                            }
                         }
                     }
                 },
@@ -256,6 +281,37 @@ fun ChatScreen(vm: MainViewModel, chatId: String, takeShared: Boolean, onBack: (
             }
         }
     }
+}
+
+/** Own name for a contact, stored privately in Firestore; only the person who sets it sees it. */
+@Composable
+private fun RenameDialog(m: Member, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf(m.name) }
+    val custom = m.name != m.realName
+    fun save(value: String) {
+        Repo.setNickname(m.uid, if (value.trim() == m.realName) "" else value)
+        onDismiss()
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Как подписать контакт?") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name, onValueChange = { name = it.take(40) }, singleLine = true,
+                    placeholder = { Text(m.realName) }, modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(8.dp))
+                Text("Это имя увидишь только ты.", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (custom) TextButton(onClick = { save("") }, contentPadding = PaddingValues(0.dp)) {
+                    Text("Вернуть «${m.realName}»")
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { save(name) }) { Text("Сохранить") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },
+    )
 }
 
 private fun isReadByOthers(chat: Chat?, me: String?, m: Message): Boolean {
@@ -312,7 +368,7 @@ private fun Bubble(
         verticalAlignment = Alignment.Bottom,
     ) {
         if (avatarSlot) {
-            Box(Modifier.size(32.dp)) { avatar?.let { Avatar(it.name, it.color, size = 32.dp) } }
+            Box(Modifier.size(32.dp)) { avatar?.let { Avatar(it, 32.dp) } }
             Spacer(Modifier.width(6.dp))
         }
         if (mine) Spacer(Modifier.width(48.dp))

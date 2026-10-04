@@ -22,6 +22,9 @@ FILES_DIR = Path(os.environ.get("FILES_DIR", "/data/files"))
 MAX_FILE_BYTES = int(os.environ.get("MAX_FILE_MB", "50")) * 1024 * 1024
 MAX_TOTAL_BYTES = int(os.environ.get("MAX_TOTAL_MB", "3072")) * 1024 * 1024
 MIN_DISK_FREE_BYTES = 500 * 1024 * 1024
+# Avatars live apart from attachments so the quota cleanup never deletes them.
+AVATARS_DIR = FILES_DIR / "avatars"
+MAX_AVATAR_BYTES = 2 * 1024 * 1024
 
 FILES_DIR.mkdir(parents=True, exist_ok=True)
 firebase_admin.initialize_app(credentials.Certificate(os.environ.get("SA_PATH", "/app/service-account.json")))
@@ -54,7 +57,7 @@ def members():
     for doc in db.collection("users").stream():
         d = doc.to_dict()
         out.append({"uid": doc.id, "name": d.get("name"), "email": d.get("email"),
-                    "color": d.get("color"), "order": d.get("order", 0)})
+                    "color": d.get("color"), "avatar": d.get("avatar"), "order": d.get("order", 0)})
     return sorted(out, key=lambda m: m["order"])
 
 
@@ -74,7 +77,7 @@ def enforce_quota():
         entries = []
         total = 0
         for d in FILES_DIR.iterdir():
-            if not d.is_dir():
+            if not d.is_dir() or d == AVATARS_DIR:
                 continue
             size = sum(f.stat().st_size for f in d.iterdir() if f.is_file())
             entries.append((d.stat().st_mtime, size, d))
@@ -114,6 +117,39 @@ async def upload(request: Request, name: str, authorization: str | None = Header
         raise
     await run_in_threadpool(enforce_quota)
     return {"path": f"{file_id}/{quote(fname)}", "name": fname, "size": size}
+
+
+# ---------- avatars ----------
+
+@app.post("/avatar")
+async def set_avatar(request: Request, authorization: str | None = Header(None)):
+    """Stores the caller's avatar (square WebP made by the app) and points users/{uid}.avatar at it."""
+    uid = (await run_in_threadpool(require_member, authorization))["uid"]
+    data = bytearray()
+    async for chunk in request.stream():
+        data += chunk
+        if len(data) > MAX_AVATAR_BYTES:
+            raise HTTPException(413, "avatar too large")
+    if data[:4] != b"RIFF" or data[8:12] != b"WEBP":
+        raise HTTPException(415, "avatar must be webp")
+
+    folder = AVATARS_DIR / uid
+    shutil.rmtree(folder, ignore_errors=True)  # keep only the current one
+    folder.mkdir(parents=True)
+    # A new random name each time, so cached copies of the old avatar never show up.
+    name = secrets.token_urlsafe(12) + ".webp"
+    (folder / name).write_bytes(data)
+    path = f"avatars/{uid}/{name}"
+    await run_in_threadpool(lambda: db.collection("users").document(uid).update({"avatar": path}))
+    return {"path": path}
+
+
+@app.delete("/avatar")
+def delete_avatar(authorization: str | None = Header(None)):
+    uid = require_member(authorization)["uid"]
+    shutil.rmtree(AVATARS_DIR / uid, ignore_errors=True)
+    db.collection("users").document(uid).update({"avatar": firestore.DELETE_FIELD})
+    return {"ok": True}
 
 
 # ---------- push ----------

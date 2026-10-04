@@ -34,7 +34,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -54,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import ru.family.homechat.BuildConfig
@@ -62,9 +62,13 @@ import ru.family.homechat.data.Repo
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatListScreen(vm: MainViewModel, title: String, onOpen: (String) -> Unit, onBack: (() -> Unit)? = null) {
+fun ChatListScreen(
+    vm: MainViewModel, title: String, onOpen: (String) -> Unit,
+    onBack: (() -> Unit)? = null, onProfile: () -> Unit = {},
+) {
     val entries by vm.entries.collectAsStateWithLifecycle()
     val me by vm.me.collectAsStateWithLifecycle()
+    val members by vm.members.collectAsStateWithLifecycle()
     val update by vm.update.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
     var menu by remember { mutableStateOf(false) }
@@ -81,7 +85,20 @@ fun ChatListScreen(vm: MainViewModel, title: String, onOpen: (String) -> Unit, o
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(Modifier.nestedScroll(scroll.nestedScrollConnection), topBar = {
         LargeTopAppBar(
-            title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            title = {
+                val mine = members.firstOrNull { it.uid == me }
+                if (onBack == null && mine != null) {
+                    // Own avatar and name instead of a title; tapping opens the profile.
+                    Row(
+                        Modifier.clip(RoundedCornerShape(28.dp)).clickable(onClick = onProfile).padding(end = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Avatar(mine, lerp(52.dp, 34.dp, scroll.state.collapsedFraction))
+                        Spacer(Modifier.width(12.dp))
+                        Text(mine.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                } else Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            },
             scrollBehavior = scroll,
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.surface,
@@ -94,14 +111,6 @@ fun ChatListScreen(vm: MainViewModel, title: String, onOpen: (String) -> Unit, o
                 if (onBack == null) {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "Меню") }
                     DropdownMenu(menu, onDismissRequest = { menu = false }) {
-                        val mine = me?.let { vm.member(it) }
-                        DropdownMenuItem(
-                            text = { Text(mine?.name ?: "", fontWeight = FontWeight.SemiBold) },
-                            leadingIcon = { Avatar(mine?.name ?: "", mine?.color, size = 28.dp) },
-                            onClick = {}, enabled = false,
-                            colors = MenuDefaults.itemColors(disabledTextColor = MaterialTheme.colorScheme.onSurface),
-                        )
-                        HorizontalDivider()
                         DropdownMenuItem(text = { Text("Проверить обновления") },
                             leadingIcon = { Icon(Icons.Filled.SystemUpdate, null) }, onClick = {
                             menu = false
@@ -154,7 +163,7 @@ private fun ChatRow(vm: MainViewModel, e: ChatEntry, me: String?, onClick: () ->
             .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(e.title, e.color, group = e.isGroup, size = 56.dp)
+        Avatar(e.title, e.color, group = e.isGroup, size = 56.dp, url = e.avatarUrl)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -41,7 +41,8 @@ object Api {
             val arr = JSONArray(r.body!!.string())
             (0 until arr.length()).map {
                 val o = arr.getJSONObject(it)
-                Member(o.getString("uid"), o.getString("name"), o.getString("email"), o.optString("color", "#90A4AE"))
+                Member(o.getString("uid"), o.getString("name"), o.getString("email"), o.optString("color", "#90A4AE"),
+                    o.optString("avatar").ifBlank { null })
             }
         }
     }
@@ -60,6 +61,21 @@ object Api {
                 JSONObject(r.body!!.string()).getString("path")
             }
         }
+
+    /** Uploads a square WebP; the server stores it and updates users/{uid}.avatar itself. */
+    suspend fun setAvatar(file: File) = withContext(Dispatchers.IO) {
+        val req = Request.Builder()
+            .url("${BuildConfig.SERVER}/avatar")
+            .header("Authorization", bearer())
+            .post(file.readBytes().toRequestBody("image/webp".toMediaTypeOrNull()))
+            .build()
+        http.newCall(req).execute().use { r -> if (!r.isSuccessful) throw ApiException(r.code, "avatar: ${r.code}") }
+    }
+
+    suspend fun deleteAvatar() = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url("${BuildConfig.SERVER}/avatar").header("Authorization", bearer()).delete().build()
+        http.newCall(req).execute().use { r -> if (!r.isSuccessful) throw ApiException(r.code, "avatar: ${r.code}") }
+    }
 
     /** Returns HTTP status code. */
     suspend fun notify(chatId: String, messageId: String): Int = withContext(Dispatchers.IO) {
