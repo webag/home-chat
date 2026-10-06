@@ -53,11 +53,16 @@ class MainViewModel : ViewModel() {
     val chats: StateFlow<List<Chat>> = me.flatMapLatest { if (it == null) flowOf(emptyList()) else Repo.chats(it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** Chats marked as unread by hand; the mark is cleared when the chat is opened. */
+    val markedUnread: StateFlow<Set<String>> = me.flatMapLatest { if (it == null) flowOf(emptySet()) else Repo.markedUnread(it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
     /** Family chat + one direct chat per other member, most recent first. */
-    val entries: StateFlow<List<ChatEntry>> = combine(me, members, chats) { me, members, chats ->
+    val entries: StateFlow<List<ChatEntry>> = combine(me, members, chats, markedUnread) { me, members, chats, marked ->
         if (me == null) return@combine emptyList()
         val byId = chats.associateBy { it.id }
         fun unread(c: Chat?): Boolean {
+            if (c != null && c.id in marked) return true
             val last = c?.last ?: return false
             if (last.senderId == me) return false
             val read = c.readBy[me] ?: return true
@@ -87,6 +92,15 @@ class MainViewModel : ViewModel() {
     suspend fun checkUpdate(): Release? = Updater.check().also { update.value = it }
 
     fun member(uid: String) = members.value.firstOrNull { it.uid == uid }
+
+    fun markUnread(chatId: String) = Repo.setMarkedUnread(chatId, true)
+
+    /** Clears the manual mark and, if there are new messages, really reads them (senders see ticks). */
+    fun markRead(chatId: String) {
+        if (chatId in markedUnread.value) Repo.setMarkedUnread(chatId, false)
+        val e = entries.value.firstOrNull { it.id == chatId }
+        if (e?.chat != null && e.unread) Repo.markRead(chatId)
+    }
 
     /** For direct chats returns the other member's uid. */
     fun peerOf(chatId: String): String? =

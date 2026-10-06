@@ -6,7 +6,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +27,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.outlined.MarkChatRead
+import androidx.compose.material.icons.outlined.MarkChatUnread
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -134,7 +138,7 @@ fun ChatListScreen(
         )
     }) { pad ->
         LazyColumn(contentPadding = pad, modifier = Modifier.padding(horizontal = 8.dp)) {
-            items(entries, key = { it.id }) { e -> ChatRow(vm, e, me) { onOpen(e.id) } }
+            items(entries, key = { it.id }) { e -> ChatRow(vm, e, me, withMenu = onBack == null) { onOpen(e.id) } }
         }
     }
 
@@ -149,8 +153,10 @@ fun ChatListScreen(
     )
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChatRow(vm: MainViewModel, e: ChatEntry, me: String?, onClick: () -> Unit) {
+private fun ChatRow(vm: MainViewModel, e: ChatEntry, me: String?, withMenu: Boolean, onClick: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
     val last = e.chat?.last
     val preview = when {
         last == null -> if (e.isGroup) "Общий чат всей семьи" else "Напиши первым"
@@ -159,7 +165,8 @@ private fun ChatRow(vm: MainViewModel, e: ChatEntry, me: String?, onClick: () ->
         else -> last.text
     }
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick)
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
+            .combinedClickable(onClick = onClick, onLongClick = { if (withMenu && last != null) menu = true })
             .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -181,6 +188,14 @@ private fun ChatRow(vm: MainViewModel, e: ChatEntry, me: String?, onClick: () ->
                     fontWeight = if (e.unread) FontWeight.Medium else FontWeight.Normal)
                 if (e.unread) Box(Modifier.padding(start = 8.dp).size(12.dp).background(BrandGradient, CircleShape))
             }
+        }
+        DropdownMenu(menu, onDismissRequest = { menu = false }) {
+            if (e.unread) DropdownMenuItem(text = { Text("Отметить прочитанным") },
+                leadingIcon = { Icon(Icons.Outlined.MarkChatRead, null) },
+                onClick = { menu = false; vm.markRead(e.id) })
+            else DropdownMenuItem(text = { Text("Отметить непрочитанным") },
+                leadingIcon = { Icon(Icons.Outlined.MarkChatUnread, null) },
+                onClick = { menu = false; vm.markUnread(e.id) })
         }
     }
 }

@@ -63,6 +63,24 @@ object Repo {
         awaitClose { reg.remove() }
     }
 
+    /** Owner-only doc with per-user chat state, kept apart from readBy so senders' read ticks don't change. */
+    private fun stateDoc(me: String) = db.collection("users").document(me).collection("private").document("state")
+
+    /** Chats the viewer marked as unread by hand. */
+    fun markedUnread(me: String): Flow<Set<String>> = callbackFlow {
+        val reg = stateDoc(me).addSnapshotListener { snap, _ ->
+            snap ?: return@addSnapshotListener
+            trySend((snap.get("unread") as? Map<*, *>).orEmpty().keys.filterIsInstance<String>().toSet())
+        }
+        awaitClose { reg.remove() }
+    }
+
+    fun setMarkedUnread(chatId: String, unread: Boolean) {
+        val me = uid ?: return
+        val value: Any = if (unread) true else FieldValue.delete()
+        stateDoc(me).set(mapOf("unread" to mapOf(chatId to value)), SetOptions.merge())
+    }
+
     /** A blank [name] removes the custom name, bringing back the member's real one. */
     fun setNickname(uid: String, name: String) {
         val me = this.uid ?: return

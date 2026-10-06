@@ -50,6 +50,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.MarkChatUnread
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -167,6 +168,10 @@ fun ChatScreen(vm: MainViewModel, chatId: String, takeShared: Boolean, onBack: (
     // Track which chat is on screen (to suppress its pushes) and mark it read while visible.
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val visible = lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    // Opening a chat removes the manual "unread" mark (once, so marking it from the menu here sticks).
+    LaunchedEffect(chatId) {
+        if (chatId in vm.markedUnread.value) Repo.setMarkedUnread(chatId, false)
+    }
     DisposableEffect(chatId) {
         App.openChatId = chatId
         onDispose { if (App.openChatId == chatId) App.openChatId = null }
@@ -221,14 +226,16 @@ fun ChatScreen(vm: MainViewModel, chatId: String, takeShared: Boolean, onBack: (
                     }
                 },
                 actions = {
-                    if (peerMember != null) {
-                        Box {
-                            IconButton(onClick = { chatMenu = true }) { Icon(Icons.Filled.MoreVert, "Меню") }
-                            DropdownMenu(chatMenu, onDismissRequest = { chatMenu = false }) {
-                                DropdownMenuItem(text = { Text("Переименовать") },
-                                    leadingIcon = { Icon(Icons.Outlined.Edit, null) },
-                                    onClick = { chatMenu = false; renaming = true })
-                            }
+                    Box {
+                        IconButton(onClick = { chatMenu = true }) { Icon(Icons.Filled.MoreVert, "Меню") }
+                        DropdownMenu(chatMenu, onDismissRequest = { chatMenu = false }) {
+                            if (chat?.last != null) DropdownMenuItem(text = { Text("Отметить непрочитанным") },
+                                leadingIcon = { Icon(Icons.Outlined.MarkChatUnread, null) },
+                                // Back to the list, otherwise the open chat would clear the mark right away.
+                                onClick = { chatMenu = false; vm.markUnread(chatId); onBack() })
+                            if (peerMember != null) DropdownMenuItem(text = { Text("Переименовать") },
+                                leadingIcon = { Icon(Icons.Outlined.Edit, null) },
+                                onClick = { chatMenu = false; renaming = true })
                         }
                     }
                 },
