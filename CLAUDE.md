@@ -27,10 +27,10 @@ Release (users get the update through the in-app updater):
 git tag v1.3 && git push origin v1.3   # .github/workflows/release.yml builds, signs, publishes
 ```
 
-Server deploy and admin (VPS `root@89.125.106.233`, dir `/opt/home-chat`, URL `https://89-125-106-233.sslip.io`):
+Server deploy and admin (VPS `root@192.124.172.211`, dir `/opt/home-chat`, URL `https://192-124-172-211.sslip.io`):
 
 ```bash
-tar -C server -cf - --exclude=members.json . | ssh root@89.125.106.233 "cd /opt/home-chat && tar -xf - && docker compose up -d --build"
+tar -C server -cf - --exclude=members.json . | ssh root@192.124.172.211 "cd /opt/home-chat && tar -xf - && docker compose up -d --build"
 docker compose exec api python admin.py list | pin <name> <pin> | setup /app/members.json | rules /app/firestore.rules
 ```
 
