@@ -30,7 +30,7 @@ android {
         targetSdk = 35
         versionCode = appVersionCode
         versionName = appVersionName
-        buildConfigField("String", "SERVER", "\"https://192-124-172-211.sslip.io\"")
+        buildConfigField("String", "SERVER", "\"https://103-31-77-94.sslip.io\"")
         // Assets of the newest GitHub release: version.json and HomeChat.apk.
         buildConfigField("String", "UPDATES", "\"https://github.com/webag/home-chat/releases/latest/download\"")
     }

@@ -27,10 +27,10 @@ Release (users get the update through the in-app updater):
 git tag v1.3 && git push origin v1.3   # .github/workflows/release.yml builds, signs, publishes
 ```
 
-Server deploy and admin (VPS `root@192.124.172.211`, dir `/opt/home-chat`, URL `https://192-124-172-211.sslip.io`):
+Server deploy and admin (VPS `root@103.31.77.94`, ssh alias `justhost` in ~/.ssh/config, dir `/opt/home-chat`, URL `https://103-31-77-94.sslip.io`):
 
 ```bash
-tar -C server -cf - --exclude=members.json . | ssh root@192.124.172.211 "cd /opt/home-chat && tar -xf - && docker compose up -d --build"
+tar -C server -cf - --exclude=members.json . | ssh justhost "cd /opt/home-chat && tar -xf - && docker compose up -d --build"
 docker compose exec api python admin.py list | pin <name> <pin> | setup /app/members.json | rules /app/firestore.rules
 ```
 
@@ -41,7 +41,7 @@ docker compose exec api python admin.py list | pin <name> <pin> | setup /app/mem
 - **Auth**: each member is a Firebase email/password account (`memberN@home-chat.family`, password = PIN), created by `server/api/admin.py`, which also sets the custom claim `family: true`. Both `firestore.rules` and the server's `require_member()` check that claim; the server accepts the Firebase ID token as a Bearer token.
 - **Firestore layout**: `users/{uid}` (name, color, order, fcmTokens); `chats/{id}` with `members`, `lastMessage`, `readBy{uid: timestamp}`; `chats/{id}/messages/{id}`. The group chat id is `family`; direct chats are `dm_<uidA>_<uidB>` (sorted) and are created lazily by the batch that writes their first message (hence `getAfter` in the rules). Read receipts are just `readBy` timestamps compared with `createdAt`.
 - **Sending** (`data/Repo.send`): one batch writes the message and the chat summary, then `push/NotifyWorker` (WorkManager, so it survives the app closing) calls the server's `POST /notify`, which reads the message from Firestore and sends FCM to the other members. `push/PushService` shows the notification unless that chat is open (`App.openChatId`).
-- **Attachments** (`data/Outbox`): images are compressed and videos get a thumbnail on the phone, then uploaded to `POST /upload`; the message stores a `FileRef` with a server path. Files are served by Caddy straight from disk at `/f/<path>`, bypassing the API. The server enforces 50 MB per file and 3 GB in total, deleting the oldest uploads past the total.
+- **Attachments** (`data/Outbox`): images are compressed and videos get a thumbnail on the phone, then uploaded to `POST /upload`; the message stores a `FileRef` with a server path. Files are served by Caddy straight from disk at `/f/<path>`, bypassing the API. The server enforces 50 MB per file and 2.5 GB in total, deleting the oldest uploads past the total.
 - **Server** (`server/`): docker compose with `caddy` (the only public container, auto-HTTPS for `$DOMAIN` from `.env` on the VPS) and `api` (FastAPI, `main.py`). `data/files`, `service-account.json`, `members.json` and `firestore.rules` are bind-mounted from the host, not baked into the image.
 - **Avatars**: the app crops to a 512px square WebP (`ui/ProfileScreen`) and sends it to `POST /avatar`; the server keeps it in `data/files/avatars/<uid>/` (excluded from the quota cleanup) and writes `users/{uid}.avatar` itself via the Admin SDK, so the client never writes that field.
 - **Custom contact names**: stored in `users/{uid}/private/contacts` (`names: {uid: name}`), readable only by the owner. `MainViewModel.members` applies them, so every screen shows them; `Member.realName` keeps the original. `data/NicknameCache` mirrors them in SharedPreferences for push notifications, which are built from the server payload (`senderId`) without Firestore.

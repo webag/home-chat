@@ -54,11 +54,11 @@ GitHub Actions ([release.yml](.github/workflows/release.yml)) соберёт п�
 
 ## Сервер
 
-VPS `192.124.172.211`, папка `/opt/home-chat`, адрес `https://192-124-172-211.sslip.io`.
+VPS `103.31.77.94`, папка `/opt/home-chat`, адрес `https://103-31-77-94.sslip.io`.
 
 ```bash
 # выкатить изменения
-tar -C server -cf - --exclude=members.json . | ssh root@192.124.172.211 "cd /opt/home-chat && tar -xf - && docker compose up -d --build"
+tar -C server -cf - --exclude=members.json . | ssh justhost "cd /opt/home-chat && tar -xf - && docker compose up -d --build"
 
 # админка (внутри контейнера)
 docker compose exec api python admin.py list                      # участники
@@ -67,4 +67,4 @@ docker compose exec api python admin.py setup /app/members.json   # завест
 docker compose exec api python admin.py rules /app/firestore.rules
 ```
 
-Лимиты: 50 МБ на файл, 3 ГБ на все вложения (старые удаляются автоматически).
+Лимиты: 50 МБ на файл, 2,5 ГБ на все вложения (старые удаляются автоматически).

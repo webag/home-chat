@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       MAX_FILE_MB: "50"
-      MAX_TOTAL_MB: "3072"
+      MAX_TOTAL_MB: "2560"
     volumes:
       - ./data/files:/data/files
       - ./service-account.json:/app/service-account.json:ro
