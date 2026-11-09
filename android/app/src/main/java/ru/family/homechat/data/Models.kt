@@ -3,7 +3,6 @@ package ru.family.homechat.data
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.DocumentSnapshot.ServerTimestampBehavior
-import ru.family.homechat.BuildConfig
 import java.util.Date
 
 /** [name] may be the viewer's own name for this contact; [realName] is the one the member has. */
@@ -37,7 +36,7 @@ data class FileRef(
     }
 
     companion object {
-        fun fileUrl(path: String) = "${BuildConfig.SERVER}/f/$path"
+        fun fileUrl(path: String) = "${ServerConfig.url}/f/$path"
 
         fun from(m: Map<*, *>?): FileRef? = m?.let {
             FileRef(

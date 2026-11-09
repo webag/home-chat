@@ -9,6 +9,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -17,6 +19,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import ru.family.homechat.data.ServerConfig
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
@@ -25,7 +28,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) handleIntent(intent)
-        setContent { HomeChatTheme { Root(vm) } }
+        setContent {
+            // File and avatar URLs are built from the server address; if server.json moved it, redraw with the new one.
+            val server by ServerConfig.flow.collectAsState()
+            HomeChatTheme { key(server) { Root(vm) } }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

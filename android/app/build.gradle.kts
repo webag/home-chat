@@ -30,7 +30,9 @@ android {
         targetSdk = 35
         versionCode = appVersionCode
         versionName = appVersionName
+        // First-run default only: the live address comes from server.json in the repo (data/ServerConfig).
         buildConfigField("String", "SERVER", "\"https://103-31-77-94.sslip.io\"")
+        buildConfigField("String", "SERVER_CONFIG", "\"https://raw.githubusercontent.com/webag/home-chat/main/server.json\"")
         // Assets of the newest GitHub release: version.json and HomeChat.apk.
         buildConfigField("String", "UPDATES", "\"https://github.com/webag/home-chat/releases/latest/download\"")
     }

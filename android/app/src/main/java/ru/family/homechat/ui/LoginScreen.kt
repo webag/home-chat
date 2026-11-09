@@ -54,6 +54,7 @@ import ru.family.homechat.R
 import ru.family.homechat.data.Api
 import ru.family.homechat.data.Member
 import ru.family.homechat.data.Repo
+import ru.family.homechat.data.ServerConfig
 
 @Composable
 fun LoginScreen() {
@@ -64,7 +65,10 @@ fun LoginScreen() {
 
     LaunchedEffect(reload) {
         loadError = false
-        runCatching { Api.members() }.onSuccess { members = it }.onFailure { loadError = true }
+        // The server may have moved: on failure re-read its address from GitHub and try once more.
+        runCatching { Api.members() }
+            .recoverCatching { e -> if (ServerConfig.refresh()) Api.members() else throw e }
+            .onSuccess { members = it }.onFailure { loadError = true }
     }
 
     Column(Modifier.fillMaxSize().background(BrandGradient)) {

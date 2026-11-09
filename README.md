@@ -52,6 +52,13 @@ GitHub Actions ([release.yml](.github/workflows/release.yml)) соберёт п�
 | `KEYSTORE_BASE64` | `android/homechat.jks` в base64 |
 | `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` | из `android/keystore.properties` |
 
+## Смена IP сервера
+
+Новую версию приложения выпускать не нужно:
+1. В `server.json` (корень репозитория) указать `https://<ip-через-дефисы>.sslip.io`, закоммитить и запушить в `main`. Приложения подхватят адрес при следующем запуске.
+2. На сервере поменять `DOMAIN=` в `/opt/home-chat/.env` и выполнить `docker compose up -d`.
+3. Поправить `HostName` у `justhost` в `~/.ssh/config`.
+
 ## Сервер
 
 VPS `103.31.77.94`, папка `/opt/home-chat`, адрес `https://103-31-77-94.sslip.io`.

@@ -34,6 +34,11 @@ tar -C server -cf - --exclude=members.json . | ssh justhost "cd /opt/home-chat &
 docker compose exec api python admin.py list | pin <name> <pin> | setup /app/members.json | rules /app/firestore.rules
 ```
 
+When the VPS IP changes (no app release needed):
+1. `server.json` in the repo root: new `https://<ip-with-dashes>.sslip.io`, commit and push to `main` — every app picks it up on next start.
+2. On the VPS: `DOMAIN=` in `/opt/home-chat/.env`, then `docker compose up -d` (Caddy gets a new certificate).
+3. `HostName` of `justhost` in `~/.ssh/config`; optionally `BuildConfig.SERVER` (first-run default) and the addresses in this file and README.
+
 ## Architecture
 
 **Firestore is the database; the VPS only does what the free Firebase plan can't** (file storage, sending FCM pushes). The app talks to Firestore directly for all messaging.
@@ -47,6 +52,7 @@ docker compose exec api python admin.py list | pin <name> <pin> | setup /app/mem
 - **Custom contact names**: stored in `users/{uid}/private/contacts` (`names: {uid: name}`), readable only by the owner. `MainViewModel.members` applies them, so every screen shows them; `Member.realName` keeps the original. `data/NicknameCache` mirrors them in SharedPreferences for push notifications, which are built from the server payload (`senderId`) without Firestore.
 - **Manual "unread" mark**: `users/{uid}/private/state` (`unread: {chatId: true}`), never via `readBy` (that would undo the sender's read ticks). `MainViewModel.entries` merges it into `unread`; opening the chat clears it.
 - **Images**: compressed on the phone to WebP 80%, long side ≤ 1920px (`Media.compressImage`); only that copy is uploaded. GIFs and undecodable images are sent as files.
+- **Server address** (`data/ServerConfig`): read at startup (and when the login screen can't reach the server) from `server.json` on GitHub raw, cached in SharedPreferences; `BuildConfig.SERVER` is only the first-run default. All URLs (API, `/f/` files) go through `ServerConfig.url`; messages store paths only, so old files survive a move. `MainActivity` re-keys the UI when the address changes.
 - **Updates** (`data/Updater`, `ui/UpdateDialog`): on start the app fetches `releases/latest/download/version.json` from the public GitHub repo and offers `HomeChat.apk` if its `versionCode` is newer.
 - **UI**: single activity with Compose Navigation (`ui/MainActivity`), one shared `MainViewModel`. Every color comes from `ui/Theme.kt`: a fixed brand palette (blue→violet `BrandGradient`, no dynamic color) plus `LocalChatColors` for chat-only colors (bubbles, background). Don't hardcode colors in screens.
 

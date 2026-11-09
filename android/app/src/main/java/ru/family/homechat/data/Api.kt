@@ -13,7 +13,6 @@ import okio.BufferedSink
 import okio.source
 import org.json.JSONArray
 import org.json.JSONObject
-import ru.family.homechat.BuildConfig
 import java.io.File
 import java.io.IOException
 import java.net.URLEncoder
@@ -35,7 +34,7 @@ object Api {
     }
 
     suspend fun members(): List<Member> = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url("${BuildConfig.SERVER}/members").build()
+        val req = Request.Builder().url("${ServerConfig.url}/members").build()
         http.newCall(req).execute().use { r ->
             if (!r.isSuccessful) throw ApiException(r.code, "members: ${r.code}")
             val arr = JSONArray(r.body!!.string())
@@ -52,7 +51,7 @@ object Api {
         withContext(Dispatchers.IO) {
             val body = ProgressBody(file, mime.toMediaTypeOrNull(), onProgress)
             val req = Request.Builder()
-                .url("${BuildConfig.SERVER}/upload?name=" + URLEncoder.encode(name, "UTF-8"))
+                .url("${ServerConfig.url}/upload?name=" + URLEncoder.encode(name, "UTF-8"))
                 .header("Authorization", bearer())
                 .post(body)
                 .build()
@@ -65,7 +64,7 @@ object Api {
     /** Uploads a square WebP; the server stores it and updates users/{uid}.avatar itself. */
     suspend fun setAvatar(file: File) = withContext(Dispatchers.IO) {
         val req = Request.Builder()
-            .url("${BuildConfig.SERVER}/avatar")
+            .url("${ServerConfig.url}/avatar")
             .header("Authorization", bearer())
             .post(file.readBytes().toRequestBody("image/webp".toMediaTypeOrNull()))
             .build()
@@ -73,7 +72,7 @@ object Api {
     }
 
     suspend fun deleteAvatar() = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url("${BuildConfig.SERVER}/avatar").header("Authorization", bearer()).delete().build()
+        val req = Request.Builder().url("${ServerConfig.url}/avatar").header("Authorization", bearer()).delete().build()
         http.newCall(req).execute().use { r -> if (!r.isSuccessful) throw ApiException(r.code, "avatar: ${r.code}") }
     }
 
@@ -81,7 +80,7 @@ object Api {
     suspend fun notify(chatId: String, messageId: String): Int = withContext(Dispatchers.IO) {
         val json = JSONObject().put("chatId", chatId).put("messageId", messageId).toString()
         val req = Request.Builder()
-            .url("${BuildConfig.SERVER}/notify")
+            .url("${ServerConfig.url}/notify")
             .header("Authorization", bearer())
             .post(json.toRequestBody("application/json".toMediaTypeOrNull()))
             .build()

@@ -4,6 +4,10 @@ import android.app.Application
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import ru.family.homechat.data.ServerConfig
 import ru.family.homechat.push.Notifications
 
 class App : Application() {
@@ -11,6 +15,7 @@ class App : Application() {
         super.onCreate()
         instance = this
         Notifications.createChannel(this)
+        CoroutineScope(Dispatchers.IO).launch { ServerConfig.refresh() }
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) { foreground = true }
             override fun onStop(owner: LifecycleOwner) { foreground = false }
