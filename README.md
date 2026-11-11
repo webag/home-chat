@@ -61,7 +61,7 @@ GitHub Actions ([release.yml](.github/workflows/release.yml)) соберёт п�
 
 ## Сервер
 
-VPS `103.31.77.94`, папка `/opt/home-chat`, адрес `https://103-31-77-94.sslip.io`.
+VPS `193.124.41.107`, папка `/opt/home-chat`, адрес `https://193-124-41-107.sslip.io`.
 
 ```bash
 # выкатить изменения

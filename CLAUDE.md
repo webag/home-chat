@@ -27,7 +27,7 @@ Release (users get the update through the in-app updater):
 git tag v1.3 && git push origin v1.3   # .github/workflows/release.yml builds, signs, publishes
 ```
 
-Server deploy and admin (VPS `root@103.31.77.94`, ssh alias `justhost` in ~/.ssh/config, dir `/opt/home-chat`, URL `https://103-31-77-94.sslip.io`):
+Server deploy and admin (VPS `root@193.124.41.107`, ssh alias `justhost` in ~/.ssh/config, dir `/opt/home-chat`, URL `https://193-124-41-107.sslip.io`):
 
 ```bash
 tar -C server -cf - --exclude=members.json . | ssh justhost "cd /opt/home-chat && tar -xf - && docker compose up -d --build"
